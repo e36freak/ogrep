@@ -103,10 +103,10 @@ while [[ $1 = -* ]]; do
   shift
 done
 
-# check to make sure the regex is specified
+# check to make sure the pattern is specified, if -e or -f haven't been used
 if ((!pattgiven)); then
   if (($#)); then
-    # set ERE to first arg
+    # add first arg to patterns
     patterns+=("$1")
     shift
   else
