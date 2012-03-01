@@ -12,7 +12,7 @@ separate output line.  PATTERNs may be any regular expression valid in AWK.
                         by newlines
   -e, --regex PATTERN   use PATTERN as the pattern. This can be used to specify
                         multiple search patterns, or to protect a pattern
-                        beginning with a hyphen (.).
+                        beginning with a hyphen (-)
   -f, --file FILE       use FILE as a list of patterns, one per line. may be
                         given multiple times, all files will be read
   -i, --ignore-case     Ignore case distinctions in both the PATTERN and the
