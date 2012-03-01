@@ -1,7 +1,6 @@
 #!/bin/bash
 
-# set variables and shopts
-shopt -s extglob nullglob
+# initialize variables
 fixed=0     # boolean, 1 if patterns are to be treated as fixed strings
 icase=0     # boolean, 1 if case is to be ignored
 count=0     # boolean, 1 if a count is to be printed instead of matches
