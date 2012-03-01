@@ -124,7 +124,7 @@ awk -v icase="$icase" -v fixed="$fixed" -v count="$count" \
     -v name="$printname" -v null="$null" '
   # prints, based on the file and null variables
   function printline(str) {
-    if (file) {
+    if (name) {
       if (null) {
         printf("%s: %s\0", FILENAME, str);
       } else {
