@@ -1,0 +1,207 @@
+#!/bin/bash
+
+# set variables and shopts
+shopt -s extglob nullglob
+fixed=0     # boolean, 1 if patterns are to be treated as fixed strings
+icase=0     # boolean, 1 if case is to be ignored
+count=0     # boolean, 1 if a count is to be printed instead of matches
+printname=0 # boolean, 1 if file names are to be printed
+forceno=0   # boolean, 1 if no filenames are to be printed no matter what
+null=0      # boolean, 1 if output is to be separated by \0 instead of \n
+pattgiven=0 # boolean, 1 if pattern has been provided
+patterns=() # array of patterns to search
+
+# display error and exit
+die() {
+  printf '%s\n' "$@"
+  exit 1
+} >&2
+
+usage() {
+cat <<'EOF'
+usage: ogrep [OPTIONS] PATTERN [FILE...]
+       ogrep [OPTIONS] [-e PATTERN | -f FILE] [FILE...]
+
+searches the named input FILEs (or standard input if no files are named, or
+if a single hyphen (-) is given as a filename) for lines matching the given
+PATTERN. Prints only the matching portions of each line, with each portion on a
+separate output line.  PATTERNs may be any regular expression valid in AWK.
+
+ Options:
+  -h, --help            display this help and exit
+  -F, --fixed-strings   interpret PATTERN as a list of fixed strings, separated
+                        by newlines
+  -e, --regex PATTERN   use PATTERN as the pattern. This can be used to specify
+                        multiple search patterns, or to protect a pattern
+                        beginning with a hyphen (.).
+  -f, --file FILE       use FILE as a list of patterns, one per line. may be
+                        given multiple times, all files will be read
+  -i, --ignore-case     Ignore case distinctions in both the PATTERN and the
+                        input files.
+  -c, --count           suppress normal output; instead print a count of
+                        matching strings for each input file
+  -W, --with-filename   print the file name for each match. this is the default
+                        when there is more than one input file
+  -w, --no-filename     do not print the file name for each match. this is the
+                        default when there is only one input file, or ogrep is
+                        only reading stdin
+  -Z, --null            separate each output line with a NUL byte
+EOF
+}
+
+# loop over parameters and separate -ab into -a -b
+while (($#)); do
+  case $1 in
+    -[!-]?*)
+      for ((i=1; i<${#1}; i++)); do
+        options+=("-${1:i:1}")
+      done
+      ;;
+    --?*=*) options+=("${1%%=*}" "${1#*=}");;
+    --) options+=(--endopts);;
+    *) options+=("$1");;
+  esac
+  shift
+done
+set -- "${options[@]}"
+
+# loop over args and check for options
+while [[ $1 = -* ]]; do
+  case $1 in
+    -h|--help) usage; exit;;
+    -F|--fixed) fixed=1;;
+    -e|--expression) 
+      # make sure ERE exists
+      [[ $2 ]] || die "no pattern specified"
+      # add ERE to patterns
+      patterns+=("$2")
+
+      pattgiven=1
+      shift
+      ;;
+    -f|--file) 
+      # validate FILE
+      [[ $2 ]] || die "no file specified for $1"
+      [[ -f $2 && -r $2 ]] || die "file $2 does not exist or is not readable"
+      # read each line in from FILE, add to patterns
+      while IFS= read -r line; do
+        patterns+=("$line")
+      done < "$2"
+
+      pattgiven=1
+      shift
+      ;;
+    -i|--ignore-case) icase=1;;
+    -c|--count) count=1;;
+    -W|--with-filename) printname=1;;
+    -w|--no-filename) forceno=1;;
+    -Z|--null) null=1;;
+    --endopts) shift; break;;
+    *) die "unknown option: $1";;
+  esac
+
+  shift
+done
+
+# check to make sure the regex is specified
+if ((!pattgiven)); then
+  if (($#)); then
+    # set ERE to first arg
+    regex=$1
+    shift
+  else
+    die "no pattern specified"
+  fi
+fi
+
+# if no files provided, make awk read stdin
+(($#)) || set -- -
+
+# determine whether or not to print filenames
+(($# > 1 && !forceno)) && printname=1
+
+# replicate GNU grep -o functionality with awk
+awk -v icase="$icase" -v fixed="$fixed" -v count="$count" \
+    -v name="$printname" -v null="$null" '
+  # prints, based on the file and null variables
+  function printline(str) {
+    if (file) {
+      if (null) {
+        printf("%s: %s\0", FILENAME, str);
+      } else {
+        printf("%s: %s\n", FILENAME, str);
+      }
+    } else {
+      if (null) {
+        printf("%s\0", str);
+      } else {
+        print str;
+      }
+    }
+  }
+
+  BEGIN {
+    # flag, so count is not printed for the patterns
+    f = 0;
+  }
+
+  # read patterns into array
+  FNR == NR {
+    if (icase) {
+      patts[tolower($0)];
+    } else {
+      patts[$0];
+    }
+
+    next;
+  }
+
+  # if count is set, print count for the file and reset
+  count && f && FNR == 1 {
+    printline(c);
+
+    c = 0;
+  }
+
+  # flip flag
+  !f {
+    f = 1;
+  }
+
+  # lowercase whole line if icase is set
+  icase {
+    $0 = tolower($0);
+  }
+
+  # if fixed is set, use index() algorithm
+  fixed {
+    for (p in patts) {
+      l = length(p);
+
+      while ((i = index($0, p))) {
+        if (!count) {
+          printline(p);
+        }
+
+        $0 = substr($0, i + l);
+        c++;
+      }
+    }
+
+    next;
+  }
+
+  # if fixed is not set, use match() algorithm
+  {
+    for (p in patts) {
+      while ((i = match($0, p))) {
+        if (!count) {
+          printline(substr($0, i, RLENGTH));
+        }
+
+        $0 = substr($0, i + RLENGTH);
+        c++;
+      }
+    }
+  }
+' <(printf '%s\n' "${patterns[@]}") "$@"
