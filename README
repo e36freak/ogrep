@@ -25,3 +25,8 @@ separate output line.  PATTERNs may be any regular expression valid in AWK.
                         default when there is only one input file, or ogrep is
                         only reading stdin
   -Z, --null            separate each output line with a NUL byte
+
+
+TODO:
+  currently, if multiple patterns are given and the same string matches both,
+  only the matching part for the first pattern is printed. fix this behavior.
