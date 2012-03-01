@@ -107,7 +107,7 @@ done
 if ((!pattgiven)); then
   if (($#)); then
     # set ERE to first arg
-    regex=$1
+    patterns+=("$1")
     shift
   else
     die "no pattern specified"
@@ -143,6 +143,11 @@ awk -v icase="$icase" -v fixed="$fixed" -v count="$count" \
   BEGIN {
     # flag, so count is not printed for the patterns
     f = 0;
+  }
+
+  # ignore empty lines, both in patterns and in the input files
+  !length() {
+    next;
   }
 
   # read patterns into array
