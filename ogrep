@@ -49,23 +49,40 @@ EOF
 }
 
 # loop over parameters and separate -ab into -a -b
+unset options
 while (($#)); do
   case $1 in
+    # if option is of type -ab
     -[!-]?*)
+      # loop over each character starting with the second
       for ((i=1; i<${#1}; i++)); do
-        options+=("-${1:i:1}")
+        c=${1:i:1}
+
+        # if it's a dash, like -O-, then
+        if [[ $c = - ]]; then
+          options+=("$c")
+        # otherwise, just append -a, -b, etc to options
+        else
+          options+=("-$c")
+        fi
       done
       ;;
+    # if option is of type --foo=bar, split on first '='
     --?*=*) options+=("${1%%=*}" "${1#*=}");;
+    # add --endopts for --
     --) options+=(--endopts);;
+    # otherwise, nothing special
     *) options+=("$1");;
   esac
+
   shift
 done
+# set new positional parameters to altered options
 set -- "${options[@]}"
+unset options
 
 # loop over args and check for options
-while [[ $1 = -* ]]; do
+while [[ $1 = -?* ]]; do
   case $1 in
     -h|--help) usage; exit;;
     -F|--fixed) fixed=1;;
