@@ -28,5 +28,4 @@ separate output line.  PATTERNs may be any regular expression valid in AWK.
 
 
 TODO:
-  currently, if multiple patterns are given and the same string matches both,
-  only the matching part for the first pattern is printed. fix this behavior.
+  consider outputting matched patterns in the order they were found on the line

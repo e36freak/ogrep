@@ -198,13 +198,14 @@ awk -v icase="$icase" -v fixed="$fixed" -v count="$count" \
   fixed {
     for (p in patts) {
       l = length(p);
+      line = $0;
 
-      while ((i = index($0, p))) {
+      while ((i = index(line, p))) {
         if (!count) {
           printline(p);
         }
 
-        $0 = substr($0, i + l);
+        line = substr(line, i + l);
         c++;
       }
     }
@@ -215,12 +216,14 @@ awk -v icase="$icase" -v fixed="$fixed" -v count="$count" \
   # if fixed is not set, use match() algorithm
   {
     for (p in patts) {
-      while ((i = match($0, p))) {
+      line = $0;
+
+      while ((i = match(line, p))) {
         if (!count) {
-          printline(substr($0, i, RLENGTH));
+          printline(substr(line, i, RLENGTH));
         }
 
-        $0 = substr($0, i + RLENGTH);
+        line = substr(line, i + RLENGTH);
         c++;
       }
     }
