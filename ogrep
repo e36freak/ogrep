@@ -311,22 +311,19 @@ count && f && FNR == 1 {
   f = 1;
 }
 
-# unset output arrays and other line-based vars
-# set "input" to all-lower if icase is set, otherwise use $0 as is
 {
+  # unset output arrays and other line-based vars
   delete_arr(out_c); delete_arr(out_v); delete_arr(lens);
   max_off = 0;
 
+  # set "input" to all-lower if icase is set, otherwise use $0 as is
   if (icase) {
     input = tolower($0);
   } else {
     input = $0;
   }
-}
 
-# populate output arrays
-{
-  # loop over each pattern
+  # populate output arrays, one pattern at a time
   for (p in patts) {
     line = input;
     offset = 0;
@@ -350,10 +347,7 @@ count && f && FNR == 1 {
       offset += match_len - 1;
     }
   }
-}
 
-# process output arrays
-{
   # iterate over out array, in order by offset, and dump values (or 
   # increment c)
   for (i=1; i<=max_off; i++) {
