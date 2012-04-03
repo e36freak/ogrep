@@ -196,17 +196,54 @@ awk -v icase="$icase" -v fixed="$fixed" -v count="$count" \
 
   # if fixed is set, use index() algorithm
   fixed {
+    # unset arrays
+    delete out_p;
+    delete out_v;
+    delete out_s;
+    delete out;
+
     for (p in patts) {
       l = length(p);
       line = $0;
+      offset = 0;
 
       while ((i = index(line, p))) {
-        if (!count) {
-          printline(p);
-        }
+        offset += i;
+        off = sprintf("%08d", offset);
+        out_v[off,++out_c[off]] = p;
 
         line = substr(line, i + l);
+
         c++;
+      }
+    }
+
+    # if any two or more values have the same offset, use the longest
+    for (i in out_c) {
+      if (out_c[i] > 1) {
+        max = 0;
+        maxv = 0;
+        for (j=1; j<=out_c[i]; j++) {
+          if ((l = length(out_v[i,j])) > max) {
+            max = l;
+            maxv = j;
+          }
+        }
+
+        cur = out_v[i,maxv];
+      } else {
+        cur = out_v[i,1];
+      }
+
+      out[i] = cur;
+    }
+
+    # iterate over out array, sorted on offset, and print values
+    if (!count) {
+      olen = asorti(out, out_s);
+
+      for (i=1; i<=olen; i++) {
+        printline(out[out_s[i]]);
       }
     }
 
@@ -215,16 +252,54 @@ awk -v icase="$icase" -v fixed="$fixed" -v count="$count" \
 
   # if fixed is not set, use match() algorithm
   {
+    # unset arrays
+    delete out_p;
+    delete out_v;
+    delete out_s;
+    delete out;
+
     for (p in patts) {
       line = $0;
 
+      offset = 0;
+
       while ((i = match(line, p))) {
-        if (!count) {
-          printline(substr(line, i, RLENGTH));
-        }
+        offset += i;
+        off = sprintf("%08d", offset);
+        out_v[off,++out_c[off]] = substr(line, i, RLENGTH);
 
         line = substr(line, i + RLENGTH);
+
         c++;
+      }
+    }
+
+    # if any two or more values have the same offset, use the longest
+    for (i in out_c) {
+      if (out_c[i] > 1) {
+        max = 0;
+        maxv = 0;
+        for (j=1; j<=out_c[i]; j++) {
+          if ((l = length(out_v[i,j])) > max) {
+            max = l;
+            maxv = j;
+          }
+        }
+
+        cur = out_v[i,maxv];
+      } else {
+        cur = out_v[i,1];
+      }
+
+      out[i] = cur;
+    }
+
+    # iterate over out array, sorted on offset, and print values
+    if (!count) {
+      olen = asorti(out, out_s);
+
+      for (i=1; i<=olen; i++) {
+        printline(out[out_s[i]]);
       }
     }
   }
