@@ -209,8 +209,7 @@ awk -v icase="$icase" -v fixed="$fixed" -v count="$count" \
 
       while ((i = index(line, p))) {
         offset += i;
-        off = sprintf("%08d", offset);
-        out_v[off,++out_c[off]] = p;
+        out_v[offset,++out_c[offset]] = p;
 
         line = substr(line, i + l);
 
@@ -240,7 +239,7 @@ awk -v icase="$icase" -v fixed="$fixed" -v count="$count" \
 
     # iterate over out array, sorted on offset, and print values
     if (!count) {
-      olen = asorti(out, out_s);
+      olen = asorti(out, out_s, "number ascending");
 
       for (i=1; i<=olen; i++) {
         printline(out[out_s[i]]);
@@ -265,8 +264,7 @@ awk -v icase="$icase" -v fixed="$fixed" -v count="$count" \
 
       while ((i = match(line, p))) {
         offset += i;
-        off = sprintf("%08d", offset);
-        out_v[off,++out_c[off]] = substr(line, i, RLENGTH);
+        out_v[offset,++out_c[offset]] = substr(line, i, RLENGTH);
 
         line = substr(line, i + RLENGTH);
 
@@ -296,7 +294,7 @@ awk -v icase="$icase" -v fixed="$fixed" -v count="$count" \
 
     # iterate over out array, sorted on offset, and print values
     if (!count) {
-      olen = asorti(out, out_s);
+      olen = asorti(out, out_s, "number ascending");
 
       for (i=1; i<=olen; i++) {
         printline(out[out_s[i]]);
