@@ -315,17 +315,19 @@ count && f && FNR == 1 {
   f = 1;
 }
 
-# lowercase whole line if icase is set
-icase {
-  $0 = tolower($0);
-}
-
 # unset output arrays and other line-based vars
+# set "input" to all-lower if icase is set, otherwise use $0 as is
 {
   delete_arr(out_c);
   delete_arr(out_v);
   delete_arr(lens);
   max_off = 0;
+
+  if (icase) {
+    input = tolower($0);
+  } else {
+    input = $0;
+  }
 }
 
 # if fixed is set, use index() algorithm to populate output arrays
@@ -333,7 +335,8 @@ fixed {
   # loop over each pattern
   for (p in patts) {
     l = length(p);
-    line = $0;
+    line = input;
+
     offset = 0;
 
     while ((i = index(line, p))) {
@@ -345,12 +348,14 @@ fixed {
       }
 
       # store matched pattern according to its offset
-      out_v[offset,++out_c[offset]] = p;
+      # get match from $0, not line or input, so icase doesn't affect it
+      out_v[offset,++out_c[offset]] = substr($0, offset, l);
       # store length to avoid more calls to length() later
       lens[offset,out_c[offset]] = l;
 
       # remove everything up to and including match from the line
       line = substr(line, i + l);
+      offset += l - 1;
     }
   }
 }
@@ -359,7 +364,7 @@ fixed {
 !fixed {
   # loop over each pattern
   for (p in patts) {
-    line = $0;
+    line = input;
     offset = 0;
 
     while ((i = match(line, p))) {
@@ -371,12 +376,15 @@ fixed {
       }
 
       # store matched pattern according to its offset
-      out_v[offset,++out_c[offset]] = substr(line, i, RLENGTH);
+      # get match from $0, not line or input, so icase doesn't affect it
+      out_v[offset,++out_c[offset]] = substr($0, offset, RLENGTH);
+      print offset, RLENGTH, substr($0, offset, RLENGTH);
       # store length to avoid more calls to length() later
       lens[offset,out_c[offset]] = RLENGTH;
 
       # remove everything up to and including match from the line
       line = substr(line, i + RLENGTH);
+      offset += RLENGTH - 1;
     }
   }
 }
