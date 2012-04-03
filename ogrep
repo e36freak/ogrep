@@ -214,14 +214,15 @@ BEGIN {
     } else if (opt == "f") {
       # check to make sure file a regular file and is readable
       file = shell_escape(optarg);
-      if (system("test -f " file) || system("test -r " file)) {
-        printf("file %s does not exist or is not readable",
+      if ((system("test -f " file) && system("test -p " file)) ||
+           system("test -r " file)) {
+        printf("file %s does not exist or is not readable\n",
                optarg) > "/dev/stderr";
       }
 
       # read each line from FILE, add to patterns
       while ((getline p < optarg) > 0) {
-        tmp_pats[optarg];
+        tmp_pats[p];
       }
 
       patt_given = 1;
