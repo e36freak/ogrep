@@ -14,17 +14,13 @@ function delete_arr(array,    i) {
 ## provided, or an invalid option is given, getopts will print the appropriate
 ## error message and return "?". returns each option as it is read, and -1 when
 ## no options are left. "optind" will be set to the index of the next
-## non-option argument when finished.  "optarg" will be set to the options
+## non-option argument when finished. "optarg" will be set to the options
 ## argument, when provided. if not provided, "optarg" will be empty. getopts
-## will delete each option and argument that it successfully reads, so awk will
-## be able to treat whatever is left as filenames/assignments, as usual. if
-## provided, "longopt_array" is the name of an associative array that maps long
-## options to the appropriate short option. (do not include the hyphens on
-## either).
-## sample usage can be found at http://auriga.kiwilight.com/~freak/awk_getopts
+## will delete each option and argument that it successfully reads. if provided,
+## "longopt_array" is the name of an associative array that maps long options to
+## the appropriate short option. (do not include the hyphens on either).
 function getopts(optstring, longarr,    opt, trimmed, hasarg, repeat) {
   hasarg = repeat = 0;
-
   # increment optind
   optind++;
 
@@ -38,7 +34,6 @@ function getopts(optstring, longarr,    opt, trimmed, hasarg, repeat) {
     for (i=1; i<=optind; i++) {
       delete ARGV[i];
     }
-
     return -1;
   }
 
@@ -50,8 +45,7 @@ function getopts(optstring, longarr,    opt, trimmed, hasarg, repeat) {
     # set hasarg to 1
     if (trimmed ~ /.*=.*/) {
       optarg = trimmed;
-      sub(/=.*/, "", trimmed);
-      sub(/^[^=]*=/, "", optarg);
+      sub(/=.*/, "", trimmed); sub(/^[^=]*=/, "", optarg);
       hasarg = 1;
     }
     
@@ -118,6 +112,20 @@ function getopts(optstring, longarr,    opt, trimmed, hasarg, repeat) {
   return opt;
 }
 
+# gets match, using match() or index() depending on whether or not 'fixed' is
+# true. returns the index of the beginning of the match, and sets the variable
+# "match_len" to the length of the match
+function match_str(str, pattern,    i) {
+  if (fixed) {
+    match_len = length(pattern);
+    return index(str, pattern);
+  } else {
+    i = match(str, pattern);
+    match_len = RLENGTH;
+    return i;
+  }
+}
+
 # prints, based on the file and null variables
 function printline(str) {
   if (name) {
@@ -138,7 +146,6 @@ function printline(str) {
 # safely escapes an argument to be used in the shell
 function shell_escape(str) {
   gsub(/'/, "'\\''", str);
-
   return "'" str "'";
 }
 
@@ -148,13 +155,11 @@ function usage() {
 "usage: ogrep -- [OPTIONS] PATTERN [FILE...]",
 "       ogrep -- [OPTIONS] [-e PATTERN | -f FILE] [FILE...]",
 "The '--' is required, so AWK itself doesn't read the options");
-
   printf("%s\n%s\n%s\n%s\n\n", 
 "Searches the named input FILEs (or standard input if no files are named, or",
 "if a single hyphen (-) is given as a filename) for lines matching the given",
 "PATTERN. Prints only the matching portions of each line, with each portion on a",
 "separate output line.  PATTERNs may be any regular expression valid in AWK.");
-
   printf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
 " Options:",
 "  -h, --help            Display this help and exit",
@@ -183,23 +188,21 @@ BEGIN {
   toexit = err = patt_given = icase = fixed = count = name = forceno = null = 0;
 
   # maps long options to the appropriate short ones
-  longopts["help"] = "h";
+  longopts["help"]          = "h";
   longopts["fixed-strings"] = "F";
-  longopts["regex"] = "e";
-  longopts["file"] = "f";
-  longopts["ignore-case"] = "i";
-  longopts["count"] = "c";
+  longopts["regex"]         = "e";
+  longopts["file"]          = "f";
+  longopts["ignore-case"]   = "i";
+  longopts["count"]         = "c";
   longopts["with-filename"] = "W";
-  longopts["no-filename"] = "w";
-  longopts["null"] = "Z";
+  longopts["no-filename"]   = "w";
+  longopts["null"]          = "Z";
 
   # read those options!
   while ((opt = getopts("hFe:f:icWwZ", longopts)) != -1) {
     # -h, --help
     if (opt == "h") {
-      usage();
-      toexit = 1;
-      exit;
+      usage(); toexit = 1; exit;
 
     # -F, --fixed
     } else if (opt == "F") {
@@ -207,8 +210,7 @@ BEGIN {
 
     # -e, --expression
     } else if (opt == "e") {
-      tmp_pats[optarg];
-      patt_given = 1;
+      tmp_pats[optarg]; patt_given = 1;
 
     # -f, --file
     } else if (opt == "f") {
@@ -219,12 +221,10 @@ BEGIN {
         printf("file %s does not exist or is not readable\n",
                optarg) > "/dev/stderr";
       }
-
       # read each line from FILE, add to patterns
       while ((getline p < optarg) > 0) {
         tmp_pats[p];
       }
-
       patt_given = 1;
 
     # -i, --ignore-case
@@ -241,8 +241,7 @@ BEGIN {
     
     # -w, --no-filename
     } else if (opt == "w") {
-      name = 0;
-      forceno = 1;
+      name = 0; forceno = 1;
 
     # -Z, --null
     } else if (opt == "Z") {
@@ -250,8 +249,7 @@ BEGIN {
 
     # error
     } else {
-      err = toexit = 1;
-      exit;
+      err = toexit = 1; exit;
     }
   }
 
@@ -260,8 +258,7 @@ BEGIN {
     # no args left
     if (++optind >= ARGC) {
       printf("no pattern specified\n") > "/dev/stderr";
-      toexit = err = 1;
-      exit;
+      toexit = err = 1; exit;
     }
 
     # assign to temporary patterns array
@@ -306,7 +303,6 @@ BEGIN {
 # if count is set, print count for the file and reset
 count && f && FNR == 1 {
   printline(c);
-
   c = 0;
 }
 
@@ -318,9 +314,7 @@ count && f && FNR == 1 {
 # unset output arrays and other line-based vars
 # set "input" to all-lower if icase is set, otherwise use $0 as is
 {
-  delete_arr(out_c);
-  delete_arr(out_v);
-  delete_arr(lens);
+  delete_arr(out_c); delete_arr(out_v); delete_arr(lens);
   max_off = 0;
 
   if (icase) {
@@ -330,16 +324,14 @@ count && f && FNR == 1 {
   }
 }
 
-# if fixed is set, use index() algorithm to populate output arrays
-fixed {
+# populate output arrays
+{
   # loop over each pattern
   for (p in patts) {
-    l = length(p);
     line = input;
-
     offset = 0;
 
-    while ((i = index(line, p))) {
+    while (i = match_str(line, p)) {
       # keep track of actual offset from original line
       offset += i;
       # maximum offset
@@ -349,42 +341,13 @@ fixed {
 
       # store matched pattern according to its offset
       # get match from $0, not line or input, so icase doesn't affect it
-      out_v[offset,++out_c[offset]] = substr($0, offset, l);
+      out_v[offset,++out_c[offset]] = substr($0, offset, match_len);
       # store length to avoid more calls to length() later
-      lens[offset,out_c[offset]] = l;
+      lens[offset,out_c[offset]] = match_len;
 
       # remove everything up to and including match from the line
-      line = substr(line, i + l);
-      offset += l - 1;
-    }
-  }
-}
-
-# if fixed is not set, use match() algorithm to populate output arrays
-!fixed {
-  # loop over each pattern
-  for (p in patts) {
-    line = input;
-    offset = 0;
-
-    while ((i = match(line, p))) {
-      # keep track of actual offset from original line
-      offset += i;
-      # maximum offset
-      if (offset > max_off) {
-        max_off = offset;
-      }
-
-      # store matched pattern according to its offset
-      # get match from $0, not line or input, so icase doesn't affect it
-      out_v[offset,++out_c[offset]] = substr($0, offset, RLENGTH);
-      print offset, RLENGTH, substr($0, offset, RLENGTH);
-      # store length to avoid more calls to length() later
-      lens[offset,out_c[offset]] = RLENGTH;
-
-      # remove everything up to and including match from the line
-      line = substr(line, i + RLENGTH);
-      offset += RLENGTH - 1;
+      line = substr(line, i + match_len);
+      offset += match_len - 1;
     }
   }
 }
@@ -406,8 +369,7 @@ fixed {
     }
 
     # find the longest and use it
-    max = 0;
-    max_ind = 0;
+    max = max_ind = 0;
 
     for (j=1; j<=out_c[i]; j++) {
       if (lens[i,j] > max) {
