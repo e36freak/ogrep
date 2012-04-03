@@ -194,111 +194,102 @@ awk -v icase="$icase" -v fixed="$fixed" -v count="$count" \
     $0 = tolower($0);
   }
 
-  # if fixed is set, use index() algorithm
-  fixed {
-    # unset arrays
-    delete out_p;
+  # unset output arrays and other line-based vars
+  {
+    delete out_c;
     delete out_v;
-    delete out_s;
-    delete out;
+    delete lens;
+    max_off = 0;
+  }
 
+  # if fixed is set, use index() algorithm to populate output arrays
+  fixed {
+    # loop over each pattern
     for (p in patts) {
       l = length(p);
       line = $0;
       offset = 0;
 
       while ((i = index(line, p))) {
+        # keep track of actual offset from original line
         offset += i;
-        out_v[offset,++out_c[offset]] = p;
-
-        line = substr(line, i + l);
-
-        c++;
-      }
-    }
-
-    # if any two or more values have the same offset, use the longest
-    for (i in out_c) {
-      if (out_c[i] > 1) {
-        max = 0;
-        maxv = 0;
-        for (j=1; j<=out_c[i]; j++) {
-          if ((l = length(out_v[i,j])) > max) {
-            max = l;
-            maxv = j;
-          }
+        # maximum offset
+        if (offset > max_off) {
+          max_off = offset;
         }
 
-        cur = out_v[i,maxv];
-      } else {
-        cur = out_v[i,1];
-      }
+        # store matched pattern according to its offset
+        out_v[offset,++out_c[offset]] = p;
+        # store length to avoid more calls to length() later
+        lens[offset,out_c[offset]] = l;
 
-      out[i] = cur;
-    }
-
-    # iterate over out array, sorted on offset, and print values
-    if (!count) {
-      olen = asorti(out, out_s, "number ascending");
-
-      for (i=1; i<=olen; i++) {
-        printline(out[out_s[i]]);
+        # remove everything up to and including match from the line
+        line = substr(line, i + l);
       }
     }
-
-    next;
   }
 
-  # if fixed is not set, use match() algorithm
-  {
-    # unset arrays
-    delete out_p;
-    delete out_v;
-    delete out_s;
-    delete out;
-
+  # if fixed is not set, use match() algorithm to populate output arrays
+  !fixed {
+    # loop over each pattern
     for (p in patts) {
       line = $0;
-
       offset = 0;
 
       while ((i = match(line, p))) {
+        # keep track of actual offset from original line
         offset += i;
-        out_v[offset,++out_c[offset]] = substr(line, i, RLENGTH);
-
-        line = substr(line, i + RLENGTH);
-
-        c++;
-      }
-    }
-
-    # if any two or more values have the same offset, use the longest
-    for (i in out_c) {
-      if (out_c[i] > 1) {
-        max = 0;
-        maxv = 0;
-        for (j=1; j<=out_c[i]; j++) {
-          if ((l = length(out_v[i,j])) > max) {
-            max = l;
-            maxv = j;
-          }
+        # maximum offset
+        if (offset > max_off) {
+          max_off = offset;
         }
 
-        cur = out_v[i,maxv];
-      } else {
-        cur = out_v[i,1];
-      }
+        # store matched pattern according to its offset
+        out_v[offset,++out_c[offset]] = substr(line, i, RLENGTH);
+        # store length to avoid more calls to length() later
+        lens[offset,out_c[offset]] = RLENGTH;
 
-      out[i] = cur;
+        # remove everything up to and including match from the line
+        line = substr(line, i + RLENGTH);
+      }
     }
+  }
 
-    # iterate over out array, sorted on offset, and print values
-    if (!count) {
-      olen = asorti(out, out_s, "number ascending");
-
-      for (i=1; i<=olen; i++) {
-        printline(out[out_s[i]]);
+  # process output arrays
+  {
+    # iterate over out array, in order by offset, and dump values (or 
+    # increment c)
+    for (i=1; i<=max_off; i++) {
+      # if no values for the offset, skip
+      if (!out_c[i]) {
+        continue;
       }
+
+      # if counting, increment count and skip the rest
+      if (count) {
+        c++;
+        continue;
+      }
+
+      # find the longest and use it
+      max = 0;
+      max_ind = 0;
+
+      for (j=1; j<=out_c[i]; j++) {
+        if (lens[i,j] > max) {
+          max = lens[i,j];
+          max_ind = j;
+        }
+      }
+
+      printline(out_v[i,max_ind]);
+    }
+  }
+
+  # if count is set, print count for the final file
+  END {
+    if (count) {
+      printline(c);
     }
   }
 ' <(printf '%s\n' "${patterns[@]}") "$@"
