@@ -1,295 +1,424 @@
-#!/bin/bash
+#!/bin/awk -f
 
-# initialize variables
-fixed=0     # boolean, 1 if patterns are to be treated as fixed strings
-icase=0     # boolean, 1 if case is to be ignored
-count=0     # boolean, 1 if a count is to be printed instead of matches
-printname=0 # boolean, 1 if file names are to be printed
-forceno=0   # boolean, 1 if no filenames are to be printed no matter what
-null=0      # boolean, 1 if output is to be separated by \0 instead of \n
-pattgiven=0 # boolean, 1 if pattern has been provided
-patterns=() # array of patterns to search
+## usage: getopts(optstring [, longopt_array ])
+## parses options, and deletes them from ARGV. "optstring" is of the form
+## "ab:c". each letter is a possible option. if the letter is followed by a
+## colon (:), then the option requires an argument. if an argument is not
+## provided, or an invalid option is given, getopts will print the appropriate
+## error message and return "?". returns each option as it is read, and -1 when
+## no options are left. "optind" will be set to the index of the next
+## non-option argument when finished.  "optarg" will be set to the options
+## argument, when provided. if not provided, "optarg" will be empty. getopts
+## will delete each option and argument that it successfully reads, so awk will
+## be able to treat whatever is left as filenames/assignments, as usual. if
+## provided, "longopt_array" is the name of an associative array that maps long
+## options to the appropriate short option. (do not include the hyphens on
+## either).
+## sample usage can be found at http://auriga.kiwilight.com/~freak/awk_getopts
+function getopts(optstring, longarr,    opt, trimmed, hasarg, repeat) {
+  hasarg = repeat = 0;
 
-# display error and exit
-die() {
-  printf '%s\n' "$@"
-  exit 1
-} >&2
+  # increment optind
+  optind++;
 
-usage() {
-cat <<'EOF'
-usage: ogrep [OPTIONS] PATTERN [FILE...]
-       ogrep [OPTIONS] [-e PATTERN | -f FILE] [FILE...]
+  # return -1 if the current arg is not an option or there are no args left
+  if (ARGV[optind] !~ /^-/ || optind >= ARGC) {
+    return -1;
+  }
 
-searches the named input FILEs (or standard input if no files are named, or
-if a single hyphen (-) is given as a filename) for lines matching the given
-PATTERN. Prints only the matching portions of each line, with each portion on a
-separate output line.  PATTERNs may be any regular expression valid in AWK.
+  # if option is "--" (end of options), delete arg and return -1
+  if (ARGV[optind] == "--") {
+    for (i=1; i<=optind; i++) {
+      delete ARGV[i];
+    }
 
- Options:
-  -h, --help            display this help and exit
-  -F, --fixed-strings   interpret PATTERN as a list of fixed strings, separated
-                        by newlines
-  -e, --regex PATTERN   use PATTERN as the pattern. This can be used to specify
-                        multiple search patterns, or to protect a pattern
-                        beginning with a hyphen (-)
-  -f, --file FILE       use FILE as a list of patterns, one per line. may be
-                        given multiple times, all files will be read
-  -i, --ignore-case     Ignore case distinctions in both the PATTERN and the
-                        input files.
-  -c, --count           suppress normal output; instead print a count of
-                        matching strings for each input file
-  -W, --with-filename   print the file name for each match. this is the default
-                        when there is more than one input file
-  -w, --no-filename     do not print the file name for each match. this is the
-                        default when there is only one input file, or ogrep is
-                        only reading stdin
-  -Z, --null            separate each output line with a NUL byte
-EOF
+    return -1;
+  }
+
+  # if the option is a long argument...
+  if (ARGV[optind] ~ /^--/) {
+    # trim hyphens
+    trimmed = substr(ARGV[optind], 3);
+    # if of the format --foo=bar, split the two. assign "bar" to optarg and
+    # set hasarg to 1
+    if (trimmed ~ /.*=.*/) {
+      optarg = trimmed;
+      sub(/=.*/, "", trimmed);
+      sub(/^[^=]*=/, "", optarg);
+      hasarg = 1;
+    }
+    
+    # invalid long opt
+    if (!(trimmed in longarr)) {
+      printf("unrecognized option -- '%s'\n", ARGV[optind]) > "/dev/stderr";
+      return "?";
+    }
+
+    opt = longarr[trimmed];
+
+  # otherwise, it is a short option
+  } else {
+    # remove the hyphen, and get just the option letter
+    opt = substr(ARGV[optind], 2, 1);
+    # set trimmed to whatevers left
+    trimmed = substr(ARGV[optind], 3);
+
+    # invalid option
+    if (!index(optstring, opt)) {
+      printf("invalid option -- '%s'\n", opt) > "/dev/stderr";
+      return "?";
+    }
+
+    # if there is more to the argument than just -o
+    if (length(trimmed)) {
+      # if option requires an argument, set the rest to optarg and hasarg to 1
+      if (index(optstring, opt ":")) {
+        optarg = trimmed;
+        hasarg = 1;
+
+      # otherwise, prepend a hyphen to the rest and set repeat to 1, so the
+      # same arg is processed again without the first option
+      } else {
+        ARGV[optind] = "-" trimmed;
+        repeat = 1;
+      }
+    }
+  }
+
+  # if the option requires an arg and hasarg is 0
+  if (index(optstring, opt ":") && !hasarg) {
+    # increment optind, check if no arguments are left
+    if (++optind >= ARGC) {
+      printf("option requires an argument -- '%s'\n", opt) > "/dev/stderr";
+      return "?";
+    }
+
+    # set optarg
+    optarg = ARGV[optind];
+
+  # if repeat is set, decrement optind so we process the same arg again
+  # mutually exclusive to needing an argument, otherwise hasarg would be set
+  } else if (repeat) {
+    optind--;
+  }
+
+  # delete all arguments up to this point, just to make sure
+  for (i=1; i<=optind; i++) {
+    delete ARGV[i];
+  }
+
+  # return the option letter
+  return opt;
 }
 
-# loop over parameters and separate -ab into -a -b
-unset options
-while (($#)); do
-  case $1 in
-    # if option is of type -ab
-    -[!-]?*)
-      # loop over each character starting with the second
-      for ((i=1; i<${#1}; i++)); do
-        c=${1:i:1}
+# deletes every element in an array, POSIXly
+function delete_arr(array,    i) {
+  for (i in array) {
+    delete array[i];
+  }
+}
 
-        # if it's a dash, like -O-, then
-        if [[ $c = - ]]; then
-          options+=("$c")
-        # otherwise, just append -a, -b, etc to options
-        else
-          options+=("-$c")
-        fi
-      done
-      ;;
-    # if option is of type --foo=bar, split on first '='
-    --?*=*) options+=("${1%%=*}" "${1#*=}");;
-    # add --endopts for --
-    --) options+=(--endopts);;
-    # otherwise, nothing special
-    *) options+=("$1");;
-  esac
+# safely escapes an argument to be used in the shell
+function shell_escape(str) {
+  gsub(q, q "\\" q q, str);
 
-  shift
-done
-# set new positional parameters to altered options
-set -- "${options[@]}"
-unset options
+  return q str q;
+}
 
-# loop over args and check for options
-while [[ $1 = -?* ]]; do
-  case $1 in
-    -h|--help) usage; exit;;
-    -F|--fixed) fixed=1;;
-    -e|--expression) 
-      # make sure ERE exists
-      [[ $2 ]] || die "no pattern specified"
-      # add ERE to patterns
-      patterns+=("$2")
-
-      pattgiven=1
-      shift
-      ;;
-    -f|--file) 
-      # validate FILE
-      [[ $2 ]] || die "no file specified for $1"
-      [[ -f $2 && -r $2 ]] || die "file $2 does not exist or is not readable"
-      # read each line in from FILE, add to patterns
-      while IFS= read -r line; do
-        patterns+=("$line")
-      done < "$2"
-
-      pattgiven=1
-      shift
-      ;;
-    -i|--ignore-case) icase=1;;
-    -c|--count) count=1;;
-    -W|--with-filename) printname=1;;
-    -w|--no-filename) forceno=1;;
-    -Z|--null) null=1;;
-    --endopts) shift; break;;
-    *) die "unknown option: $1";;
-  esac
-
-  shift
-done
-
-# check to make sure the pattern is specified, if -e or -f haven't been used
-if ((!pattgiven)); then
-  if (($#)); then
-    # add first arg to patterns
-    patterns+=("$1")
-    shift
-  else
-    die "no pattern specified"
-  fi
-fi
-
-# if no files provided, make awk read stdin
-(($#)) || set -- -
-
-# determine whether or not to print filenames
-(($# > 1 && !forceno)) && printname=1
-
-# replicate GNU grep -o functionality with awk
-awk -v icase="$icase" -v fixed="$fixed" -v count="$count" \
-    -v name="$printname" -v null="$null" '
-  # prints, based on the file and null variables
-  function printline(str) {
-    if (name) {
-      if (null) {
-        printf("%s: %s\0", FILENAME, str);
-      } else {
-        printf("%s: %s\n", FILENAME, str);
-      }
+# prints, based on the file and null variables
+function printline(str) {
+  if (name) {
+    if (null) {
+      printf("%s: %s\0", FILENAME, str);
     } else {
-      if (null) {
-        printf("%s\0", str);
-      } else {
-        print str;
+      printf("%s: %s\n", FILENAME, str);
+    }
+  } else {
+    if (null) {
+      printf("%s\0", str);
+    } else {
+      print str;
+    }
+  }
+}
+
+# prints usage information
+function usage() {
+  printf("%s\n%s\n\n%s\n\n",
+"usage: ogrep -- [OPTIONS] PATTERN [FILE...]",
+"       ogrep -- [OPTIONS] [-e PATTERN | -f FILE] [FILE...]",
+"The '--' is required, so AWK itself doesn't read the options");
+
+  printf("%s\n%s\n%s\n%s\n\n", 
+"Searches the named input FILEs (or standard input if no files are named, or",
+"if a single hyphen (-) is given as a filename) for lines matching the given",
+"PATTERN. Prints only the matching portions of each line, with each portion on a",
+"separate output line.  PATTERNs may be any regular expression valid in AWK.");
+
+  printf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
+" Options:",
+"  -h, --help            Display this help and exit",
+"  -F, --fixed-strings   Interpret PATTERN as a list of fixed strings, separated",
+"                        by newlines",
+"  -e, --regex PATTERN   Use PATTERN as the pattern. This can be used to specify",
+"                        multiple search patterns, or to protect a pattern",
+"                        beginning with a hyphen (-)",
+"  -f, --file FILE       Use FILE as a list of patterns, one per line. may be",
+"                        given multiple times, all files will be read");
+  printf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
+"  -i, --ignore-case     Ignore case distinctions in both the PATTERN and the",
+"                        input files.",
+"  -c, --count           Suppress normal output; instead print a count of",
+"                        matching strings for each input file",
+"  -W, --with-filename   Print the file name for each match. this is the default",
+"                        when there is more than one input file",
+"  -w, --no-filename     Do not print the file name for each match. this is the",
+"                        default when there is only one input file, or ogrep is",
+"                        only reading stdin",
+"  -Z, --null            Separate each output line with a NUL byte");
+}
+
+BEGIN {
+  # initialize default variables
+  toexit = err = patt_given = icase = fixed = count = name = forceno = null = 0;
+
+  # maps long options to the appropriate short ones
+  longopts["help"] = "h";
+  longopts["fixed-strings"] = "F";
+  longopts["regex"] = "e";
+  longopts["file"] = "f";
+  longopts["ignore-case"] = "i";
+  longopts["count"] = "c";
+  longopts["with-filename"] = "W";
+  longopts["no-filename"] = "w";
+  longopts["null"] = "Z";
+
+  # read those options!
+  while ((opt = getopts("hFe:f:icWwZ", longopts)) != -1) {
+    # -h, --help
+    if (opt == "h") {
+      usage();
+      toexit = 1;
+      exit;
+
+    # -F, --fixed
+    } else if (opt == "F") {
+      fixed = 1;
+
+    # -e, --expression
+    } else if (opt == "e") {
+      tmp_pats[optarg];
+      patt_given = 1;
+
+    # -f, --file
+    } else if (opt == "f") {
+      # check to make sure file a regular file and is readable
+      file = shell_escape(optarg);
+      if (system("test -f " file) || system("test -r " file)) {
+        printf("file %s does not exist or is not readable",
+               optarg) > "/dev/stderr";
       }
+
+      # read each line from FILE, add to patterns
+      while ((getline p < optarg) > 0) {
+        tmp_pats[optarg];
+      }
+
+      patt_given = 1;
+
+    # -i, --ignore-case
+    } else if (opt == "i") {
+      icase = 1;
+
+    # -c, --count
+    } else if (opt == "c") {
+      count = 1;
+
+    # -W, --with-filename
+    } else if (opt == "W") {
+      name = 1;
+    
+    # -w, --no-filename
+    } else if (opt == "w") {
+      name = 0;
+      forceno = 1;
+
+    # -Z, --null
+    } else if (opt == "Z") {
+      null = 1;
+
+    # error
+    } else {
+      err = toexit = 1;
+      exit;
     }
   }
 
-  BEGIN {
-    # flag, so count is not printed for the patterns
-    f = 0;
+  # get pattern from ARGV if -e or -f havent been used
+  if (!patt_given) {
+    # no args left
+    if (++optind >= ARGC) {
+      printf("no pattern specified\n") > "/dev/stderr";
+      toexit = err = 1;
+      exit;
+    }
+
+    # assign to temporary patterns array
+    tmp_pats[ARGV[optind]];
+
+    # delete args
+    for (i=1; i<=optind; i++) {
+      delete ARGV[i];
+    }
   }
 
-  # ignore empty lines, both in patterns and in the input files
-  !length() {
-    next;
+  # figure out "name" variable
+  if (ARGC - optind > 1 && !forceno) {
+    name = 1;
   }
 
-  # read patterns into array
-  FNR == NR {
+  # assign tmp_pats to the real patts array
+  for (p in tmp_pats) {
+    # ignore empty patterns
+    if (!length(p)) {
+      continue;
+    }
+
+    # use tolower() if icase is set
     if (icase) {
-      patts[tolower($0)];
+      patts[tolower(p)];
     } else {
-      patts[$0];
-    }
-
-    next;
-  }
-
-  # if count is set, print count for the file and reset
-  count && f && FNR == 1 {
-    printline(c);
-
-    c = 0;
-  }
-
-  # flip flag
-  !f {
-    f = 1;
-  }
-
-  # lowercase whole line if icase is set
-  icase {
-    $0 = tolower($0);
-  }
-
-  # unset output arrays and other line-based vars
-  {
-    delete out_c;
-    delete out_v;
-    delete lens;
-    max_off = 0;
-  }
-
-  # if fixed is set, use index() algorithm to populate output arrays
-  fixed {
-    # loop over each pattern
-    for (p in patts) {
-      l = length(p);
-      line = $0;
-      offset = 0;
-
-      while ((i = index(line, p))) {
-        # keep track of actual offset from original line
-        offset += i;
-        # maximum offset
-        if (offset > max_off) {
-          max_off = offset;
-        }
-
-        # store matched pattern according to its offset
-        out_v[offset,++out_c[offset]] = p;
-        # store length to avoid more calls to length() later
-        lens[offset,out_c[offset]] = l;
-
-        # remove everything up to and including match from the line
-        line = substr(line, i + l);
-      }
+      patts[p];
     }
   }
+  delete_arr(tmp_pats);
 
-  # if fixed is not set, use match() algorithm to populate output arrays
-  !fixed {
-    # loop over each pattern
-    for (p in patts) {
-      line = $0;
-      offset = 0;
+  # flag, so count is not printed for the beginning of the first file
+  f = 0;
+}
 
-      while ((i = match(line, p))) {
-        # keep track of actual offset from original line
-        offset += i;
-        # maximum offset
-        if (offset > max_off) {
-          max_off = offset;
-        }
+# ignore empty lines
+!length() {
+  next;
+}
 
-        # store matched pattern according to its offset
-        out_v[offset,++out_c[offset]] = substr(line, i, RLENGTH);
-        # store length to avoid more calls to length() later
-        lens[offset,out_c[offset]] = RLENGTH;
+# if count is set, print count for the file and reset
+count && f && FNR == 1 {
+  printline(c);
 
-        # remove everything up to and including match from the line
-        line = substr(line, i + RLENGTH);
+  c = 0;
+}
+
+# flip flag
+!f {
+  f = 1;
+}
+
+# lowercase whole line if icase is set
+icase {
+  $0 = tolower($0);
+}
+
+# unset output arrays and other line-based vars
+{
+  delete_arr(out_c);
+  delete_arr(out_v);
+  delete_arr(lens);
+  max_off = 0;
+}
+
+# if fixed is set, use index() algorithm to populate output arrays
+fixed {
+  # loop over each pattern
+  for (p in patts) {
+    l = length(p);
+    line = $0;
+    offset = 0;
+
+    while ((i = index(line, p))) {
+      # keep track of actual offset from original line
+      offset += i;
+      # maximum offset
+      if (offset > max_off) {
+        max_off = offset;
       }
+
+      # store matched pattern according to its offset
+      out_v[offset,++out_c[offset]] = p;
+      # store length to avoid more calls to length() later
+      lens[offset,out_c[offset]] = l;
+
+      # remove everything up to and including match from the line
+      line = substr(line, i + l);
     }
   }
+}
 
-  # process output arrays
-  {
-    # iterate over out array, in order by offset, and dump values (or 
-    # increment c)
-    for (i=1; i<=max_off; i++) {
-      # if no values for the offset, skip
-      if (!out_c[i]) {
-        continue;
+# if fixed is not set, use match() algorithm to populate output arrays
+!fixed {
+  # loop over each pattern
+  for (p in patts) {
+    line = $0;
+    offset = 0;
+
+    while ((i = match(line, p))) {
+      # keep track of actual offset from original line
+      offset += i;
+      # maximum offset
+      if (offset > max_off) {
+        max_off = offset;
       }
 
-      # if counting, increment count and skip the rest
-      if (count) {
-        c++;
-        continue;
-      }
+      # store matched pattern according to its offset
+      out_v[offset,++out_c[offset]] = substr(line, i, RLENGTH);
+      # store length to avoid more calls to length() later
+      lens[offset,out_c[offset]] = RLENGTH;
 
-      # find the longest and use it
-      max = 0;
-      max_ind = 0;
-
-      for (j=1; j<=out_c[i]; j++) {
-        if (lens[i,j] > max) {
-          max = lens[i,j];
-          max_ind = j;
-        }
-      }
-
-      printline(out_v[i,max_ind]);
+      # remove everything up to and including match from the line
+      line = substr(line, i + RLENGTH);
     }
   }
+}
 
-  # if count is set, print count for the final file
-  END {
+# process output arrays
+{
+  # iterate over out array, in order by offset, and dump values (or 
+  # increment c)
+  for (i=1; i<=max_off; i++) {
+    # if no values for the offset, skip
+    if (!out_c[i]) {
+      continue;
+    }
+
+    # if counting, increment count and skip the rest
     if (count) {
-      printline(c);
+      c++;
+      continue;
     }
+
+    # find the longest and use it
+    max = 0;
+    max_ind = 0;
+
+    for (j=1; j<=out_c[i]; j++) {
+      if (lens[i,j] > max) {
+        max = lens[i,j];
+        max_ind = j;
+      }
+    }
+
+    printline(out_v[i,max_ind]);
   }
-' <(printf '%s\n' "${patterns[@]}") "$@"
+}
+
+# if count is set, print count for the final file
+END {
+  # exit if "toexit" is set
+  if (toexit) {
+    exit err;
+  }
+
+  if (count) {
+    printline(c);
+  }
+}
