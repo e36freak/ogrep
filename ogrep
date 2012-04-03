@@ -120,9 +120,9 @@ function delete_arr(array,    i) {
 
 # safely escapes an argument to be used in the shell
 function shell_escape(str) {
-  gsub(q, q "\\" q q, str);
+  gsub(/'/, "'\\''", str);
 
-  return q str q;
+  return "'" str "'";
 }
 
 # prints, based on the file and null variables
