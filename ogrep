@@ -1,5 +1,12 @@
 #!/bin/awk -f
 
+# deletes every element in an array, POSIXly
+function delete_arr(array,    i) {
+  for (i in array) {
+    delete array[i];
+  }
+}
+
 ## usage: getopts(optstring [, longopt_array ])
 ## parses options, and deletes them from ARGV. "optstring" is of the form
 ## "ab:c". each letter is a possible option. if the letter is followed by a
@@ -111,20 +118,6 @@ function getopts(optstring, longarr,    opt, trimmed, hasarg, repeat) {
   return opt;
 }
 
-# deletes every element in an array, POSIXly
-function delete_arr(array,    i) {
-  for (i in array) {
-    delete array[i];
-  }
-}
-
-# safely escapes an argument to be used in the shell
-function shell_escape(str) {
-  gsub(/'/, "'\\''", str);
-
-  return "'" str "'";
-}
-
 # prints, based on the file and null variables
 function printline(str) {
   if (name) {
@@ -140,6 +133,13 @@ function printline(str) {
       print str;
     }
   }
+}
+
+# safely escapes an argument to be used in the shell
+function shell_escape(str) {
+  gsub(/'/, "'\\''", str);
+
+  return "'" str "'";
 }
 
 # prints usage information
@@ -408,6 +408,7 @@ fixed {
       }
     }
 
+    # print the damn thing, already
     printline(out_v[i,max_ind]);
   }
 }
