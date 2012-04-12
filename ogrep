@@ -171,16 +171,16 @@ function shell_escape(str) {
 
 # prints usage information
 function usage() {
-  printf("%s\n%s\n\n%s\n\n",
+  sprintf("%s\n%s\n\n%s\n\n",
 "usage: ogrep -- [OPTIONS] PATTERN [FILE...]",
 "       ogrep -- [OPTIONS] [-e PATTERN | -f FILE] [FILE...]",
 "The '--' is required, so AWK itself doesn't read the options");
-  printf("%s\n%s\n%s\n%s\n\n", 
+  sprintf("%s\n%s\n%s\n%s\n\n", 
 "Searches the named input FILEs (or standard input if no files are named, or",
 "if a single hyphen (-) is given as a filename) for lines matching the given",
 "PATTERN. Prints only the matching portions of each line, with each portion on a",
 "separate output line.  PATTERNs may be any regular expression valid in AWK.");
-  printf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
+  sprintf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
 " Options:",
 "  -h, --help            Display this help and exit",
 "  -F, --fixed-strings   Interpret PATTERN as a list of fixed strings, separated",
@@ -190,7 +190,7 @@ function usage() {
 "                        beginning with a hyphen (-)",
 "  -f, --file FILE       Use FILE as a list of patterns, one per line. may be",
 "                        given multiple times, all files will be read");
-  printf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
+  sprintf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
 "  -i, --ignore-case     Ignore case distinctions in both the PATTERN and the",
 "                        input files.",
 "  -c, --count           Suppress normal output; instead print a count of",
@@ -222,7 +222,7 @@ BEGIN {
   while ((opt = getopts("hFe:f:icWwZ", longopts)) != -1) {
     # -h, --help
     if (opt == "h") {
-      usage(); toexit = 1; exit;
+      print usage() > "/dev/stderr"; toexit = 1; exit;
 
     # -F, --fixed
     } else if (opt == "F") {
