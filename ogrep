@@ -21,10 +21,8 @@
 # IN THE SOFTWARE.
 
 # deletes every element in an array, POSIXly
-function delete_arr(array,    i) {
-  for (i in array) {
-    delete array[i];
-  }
+function delete_arr(array) {
+  split("", array);
 }
 
 ## usage: getopts(optstring [, longopt_array ])
@@ -217,7 +215,8 @@ function usage() {
 
 BEGIN {
   # initialize default variables
-  toexit = err = patt_given = icase = fixed = count = name = forceno = null = 0;
+  toexit = err = 0;
+  patt_given = icase = fixed = count = name = forceno = null = 0;
 
   # maps long options to the appropriate short ones
   longopts["help"]          = "h";
