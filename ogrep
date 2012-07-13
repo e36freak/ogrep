@@ -277,12 +277,13 @@ BEGIN {
 
     # -f, --file
     } else if (opt == "f") {
-      # check to make sure file is a regular file and is readable
+      # check to make sure file is a regular file (or fifo) and is readable
       file = shell_escape(optarg);
       if ((system("test -f " file) && system("test -p " file)) ||
            system("test -r " file)) {
-        printf("file %s does not exist or is not readable\n",
-               optarg) > "/dev/stderr";
+        printf("%s: permission denied\n", optarg) > "/dev/stderr";
+        err = toexit = 1;
+        exit;
       }
       # read each line from FILE, add to patterns
       while ((getline p < optarg) > 0) {
