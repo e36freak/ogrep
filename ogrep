@@ -20,6 +20,38 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 
+
+# usage: ogrep -- [OPTIONS] PATTERN [FILE...]
+#        ogrep -- [OPTIONS] [-e PATTERN | -f FILE] [FILE...]
+# 
+# The '--' is required, so AWK itself doesn't read the options
+# 
+# Searches the named input FILEs (or standard input if no files are named, or
+# if a single hyphen (-) is given as a filename) for lines matching the given
+# PATTERN. Prints only the matching portions of each line, with each portion on a
+# separate output line.  PATTERNs may be any regular expression valid in AWK.
+# 
+#  Options:
+#   -h, --help            Display this help and exit
+#   -F, --fixed-strings   Interpret PATTERN as a list of fixed strings, separated
+#                         by newlines
+#   -e, --regex PATTERN   Use PATTERN as the pattern. This can be used to specify
+#                         multiple search patterns, or to protect a pattern
+#                         beginning with a hyphen (-)
+#   -f, --file FILE       Use FILE as a list of patterns, one per line. may be
+#                         given multiple times, all files will be read
+#   -i, --ignore-case     Ignore case distinctions in both the PATTERN and the
+#                         input files.
+#   -c, --count           Suppress normal output; instead print a count of
+#                         matching strings for each input file
+#   -W, --with-filename   Print the file name for each match. this is the default
+#                         when there is more than one input file
+#   -w, --no-filename     Do not print the file name for each match. this is the
+#                         default when there is only one input file, or ogrep is
+#                         only reading stdin
+#   -Z, --null            Separate each output line with a NUL byte
+
+
 # deletes every element in an array, POSIXly
 function delete_arr(array,    i) {
   for (i in array) {
@@ -234,7 +266,7 @@ BEGIN {
 
     # -f, --file
     } else if (opt == "f") {
-      # check to make sure file a regular file and is readable
+      # check to make sure file is a regular file and is readable
       file = shell_escape(optarg);
       if ((system("test -f " file) && system("test -p " file)) ||
            system("test -r " file)) {
