@@ -1,6 +1,6 @@
 #!/bin/awk -f
 
-# Copywrite Daniel Mills <danielmills1@gmail.com>
+# Copyright Daniel Mills <danielmills1@gmail.com>
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to
@@ -53,10 +53,8 @@
 
 
 # deletes every element in an array, POSIXly
-function delete_arr(array,    i) {
-  for (i in array) {
-    delete array[i];
-  }
+function delete_arr(array) {
+  split("", array);
 }
 
 ## usage: getopts(optstring [, longopt_array ])
@@ -64,13 +62,17 @@ function delete_arr(array,    i) {
 ## "ab:c". each letter is a possible option. if the letter is followed by a
 ## colon (:), then the option requires an argument. if an argument is not
 ## provided, or an invalid option is given, getopts will print the appropriate
-## error message and return "?". returns each option as it is read, and -1 when
+## error message and return "?". returns each option as it's read, and -1 when
 ## no options are left. "optind" will be set to the index of the next
-## non-option argument when finished. "optarg" will be set to the options
-## argument, when provided. if not provided, "optarg" will be empty. getopts
-## will delete each option and argument that it successfully reads. if provided,
+## non-option argument when finished.  "optarg" will be set to the option's
+## argument, when provided. if not provided, "optarg" will be empty. "optname"
+## will be set to the current option, as provided. getopts will delete each
+## option and argument that it successfully reads, so awk will be able to treat
+## whatever's left as filenames/assignments, as usual. if provided,
 ## "longopt_array" is the name of an associative array that maps long options to
 ## the appropriate short option. (do not include the hyphens on either).
+## sample usage can be found in the examples dir, with gawk extensions, or in
+## the ogrep script for a POSIX example: https://github.com/e36freak/ogrep
 function getopts(optstring, longarr,    opt, trimmed, hasarg, repeat) {
   hasarg = repeat = 0;
   # increment optind
@@ -108,6 +110,8 @@ function getopts(optstring, longarr,    opt, trimmed, hasarg, repeat) {
     }
 
     opt = longarr[trimmed];
+    # set optname by prepending dashes to the trimmed argument
+    optname = "--" trimmed;
 
   # otherwise, it is a short option
   } else {
@@ -136,13 +140,16 @@ function getopts(optstring, longarr,    opt, trimmed, hasarg, repeat) {
         repeat = 1;
       }
     }
+
+    # set optname by prepending a hypen to opt
+    optname = "-" opt;
   }
 
   # if the option requires an arg and hasarg is 0
   if (index(optstring, opt ":") && !hasarg) {
     # increment optind, check if no arguments are left
     if (++optind >= ARGC) {
-      printf("option requires an argument -- '%s'\n", opt) > "/dev/stderr";
+      printf("option requires an argument -- '%s'\n", optname) > "/dev/stderr";
       return "?";
     }
 
@@ -206,12 +213,13 @@ function usage() {
   printf("%s\n%s\n\n%s\n\n",
 "usage: ogrep -- [OPTIONS] PATTERN [FILE...]",
 "       ogrep -- [OPTIONS] [-e PATTERN | -f FILE] [FILE...]",
-"The '--' is required, so AWK itself doesn't read the options");
+"The '--' is required, so AWK itself doesn't read the options") > "/dev/stderr";
   printf("%s\n%s\n%s\n%s\n\n", 
 "Searches the named input FILEs (or standard input if no files are named, or",
 "if a single hyphen (-) is given as a filename) for lines matching the given",
 "PATTERN. Prints only the matching portions of each line, with each portion on a",
-"separate output line.  PATTERNs may be any regular expression valid in AWK.");
+"separate output line.  PATTERNs may be any regular expression valid in AWK." \
+) > "/dev/stderr";
   printf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
 " Options:",
 "  -h, --help            Display this help and exit",
@@ -221,7 +229,8 @@ function usage() {
 "                        multiple search patterns, or to protect a pattern",
 "                        beginning with a hyphen (-)",
 "  -f, --file FILE       Use FILE as a list of patterns, one per line. may be",
-"                        given multiple times, all files will be read");
+"                        given multiple times, all files will be read" \
+) > "/dev/stderr"
   printf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
 "  -i, --ignore-case     Ignore case distinctions in both the PATTERN and the",
 "                        input files.",
@@ -232,12 +241,14 @@ function usage() {
 "  -w, --no-filename     Do not print the file name for each match. this is the",
 "                        default when there is only one input file, or ogrep is",
 "                        only reading stdin",
-"  -Z, --null            Separate each output line with a NUL byte");
+"  -Z, --null            Separate each output line with a NUL byte" \
+) > "/dev/stderr";
 }
 
 BEGIN {
   # initialize default variables
-  toexit = err = patt_given = icase = fixed = count = name = forceno = null = 0;
+  toexit = err = 0;
+  patt_given = icase = fixed = count = name = forceno = null = 0;
 
   # maps long options to the appropriate short ones
   longopts["help"]          = "h";
