@@ -321,7 +321,7 @@ BEGIN {
   # get pattern from ARGV if -e or -f havent been used
   if (!patt_given) {
     # no args left
-    if (++optind >= ARGC) {
+    if (optind >= ARGC) {
       printf("no pattern specified\n") > "/dev/stderr";
       toexit = err = 1; exit;
     }
