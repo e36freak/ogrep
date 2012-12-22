@@ -49,6 +49,8 @@
 #   -w, --no-filename     Do not print the file name for each match. this is the
 #                         default when there is only one input file, or ogrep is
 #                         only reading stdin
+#   -n, --line-number     Prefix each line of output with the 1-based line number
+#                         within its input file.
 #   -Z, --null            Separate each output line with a NUL byte
 
 
@@ -186,19 +188,35 @@ function match_str(str, pattern,    i) {
   }
 }
 
-# prints, based on the file and null variables
+# prints, based on the file, lineno, and null variables
 function printline(str) {
   if (name) {
-    if (null) {
-      printf("%s: %s\0", FILENAME, str);
+    if (lineno) {
+      if (null) {
+        printf("%s:%d:%s\0", FILENAME, FNR, str);
+      } else {
+        printf("%s:%d:%s\n", FILENAME, FNR, str);
+      }
     } else {
-      printf("%s: %s\n", FILENAME, str);
+      if (null) {
+        printf("%s:%s\0", FILENAME, str);
+      } else {
+        printf("%s:%s\n", FILENAME, str);
+      }
     }
   } else {
-    if (null) {
-      printf("%s\0", str);
+    if (lineno) {
+      if (null) {
+        printf("%d:%s\0", FNR, str);
+      } else {
+        printf("%d:%s\n", FNR, str);
+      }
     } else {
-      print str;
+      if (null) {
+        printf("%s\0", str);
+      } else {
+        print str;
+      }
     }
   }
 }
@@ -232,7 +250,7 @@ function usage() {
 "  -f, --file FILE       Use FILE as a list of patterns, one per line. may be",
 "                        given multiple times, all files will be read" \
 ) > "/dev/stderr"
-  printf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
+  printf("%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
 "  -i, --ignore-case     Ignore case distinctions in both the PATTERN and the",
 "                        input files.",
 "  -c, --count           Suppress normal output; instead print a count of",
@@ -242,6 +260,8 @@ function usage() {
 "  -w, --no-filename     Do not print the file name for each match. this is the",
 "                        default when there is only one input file, or ogrep is",
 "                        only reading stdin",
+"  -n, --line-number     Prefix each line of output with the 1-based line number",
+"                        within its input file.",
 "  -Z, --null            Separate each output line with a NUL byte" \
 ) > "/dev/stderr";
 }
@@ -249,7 +269,7 @@ function usage() {
 BEGIN {
   # initialize default variables
   toexit = err = 0;
-  patt_given = icase = fixed = count = name = forceno = null = 0;
+  patt_given = icase = fixed = count = name = forceno = lineno = null = 0;
 
   # maps long options to the appropriate short ones
   longopts["help"]          = "h";
@@ -260,6 +280,7 @@ BEGIN {
   longopts["count"]         = "c";
   longopts["with-filename"] = "W";
   longopts["no-filename"]   = "w";
+  longopts["line-number"]   = "n";
   longopts["null"]          = "Z";
 
   # read those options!
@@ -307,6 +328,10 @@ BEGIN {
     # -w, --no-filename
     } else if (opt == "w") {
       name = 0; forceno = 1;
+
+    # -n, --line-number
+    } else if (opt == "n") {
+      lineno = 1;
 
     # -Z, --null
     } else if (opt == "Z") {

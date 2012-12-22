@@ -26,4 +26,6 @@ separate output line.  PATTERNs may be any regular expression valid in AWK.
   -w, --no-filename     Do not print the file name for each match. this is the
                         default when there is only one input file, or ogrep is
                         only reading stdin
+  -n, --line-number     Prefix each line of output with the 1-based line number
+                        within its input file.
   -Z, --null            Separate each output line with a NUL byte
