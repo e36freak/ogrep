@@ -477,4 +477,6 @@ END {
   if (count) {
     printline(c);
   }
+
+  exit err;
 }
